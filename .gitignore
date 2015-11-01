@@ -1,0 +1,4 @@
+RandomAccess.o
+SHMEMRandomAccess.o
+ra_shmem
+verification.o
