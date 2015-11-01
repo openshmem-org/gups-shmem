@@ -219,18 +219,10 @@ HPCC_Params params;
 int main(int argc, char **argv)
 {
   int myRank, commSize;
-  char *outFname;
-  FILE *outputFile;
-  //static HPCC_Params params;
   time_t currentTime;
   int provided;
 
   shmem_init();
-
-
-  outFname = "hpccoutf.txt";
-
-  shmem_barrier_all();
 
   HPCC_SHMEMRandomAccess( &params );
 
