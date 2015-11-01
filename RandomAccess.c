@@ -201,45 +201,19 @@ HPCC_SHMEMRandomAccess(HPCC_Params *params) {
 
 
   /* determine whether the number of processors is a power of 2 */
-  for (i = 1, logNumProcs = 0; ; logNumProcs++, i <<= 1) {
-    if (i == NumProcs) {
-      PowerofTwo = HPCC_TRUE;
-      Remainder = 0;
-      Top = 0;
-      MinLocalTableSize = (TableSize / NumProcs);
-      LocalTableSize = MinLocalTableSize;
-      GlobalStartMyProc = (MinLocalTableSize * MyProc);
-      break;
-
-    /* number of processes is not a power 2 (too many shifts may introduce negative values or 0) */
+  if ( (NumProcs & (NumProcs -1)) == 0) {
+    PowerofTwo = HPCC_TRUE;
+    Remainder = 0;
+    Top = 0;
+    MinLocalTableSize = (TableSize / NumProcs);
+    LocalTableSize = MinLocalTableSize;
+    GlobalStartMyProc = (MinLocalTableSize * MyProc);
+  }
+  else {
+    if(MyProc == 0) {
+        printf("Number of processes must be power of 2\n");
 
     }
-    else if (i > NumProcs || i <= 0) {
-      PowerofTwo = HPCC_FALSE;
-      /* Minimum local table size --- some processors have an additional entry */
-      MinLocalTableSize = (TableSize / NumProcs);
-      /* Number of processors with (LocalTableSize + 1) entries */
-      Remainder = TableSize  - (MinLocalTableSize * NumProcs);
-      /* Number of table entries in top of Table */
-      Top = (MinLocalTableSize + 1) * Remainder;
-      /* Local table size */
-      if (MyProc < Remainder) {
-          LocalTableSize = (MinLocalTableSize + 1);
-          GlobalStartMyProc = ( (MinLocalTableSize + 1) * MyProc);
-        }
-        else {
-          LocalTableSize = MinLocalTableSize;
-          GlobalStartMyProc = ( (MinLocalTableSize * MyProc) + Remainder );
-        }
-      break;
-
-    } /* end else if */
-  } /* end for i */
-
-  if(PowerofTwo == HPCC_FALSE){
-  
-    if(MyProc == 0)
-        printf("Number of processes must be power of 2\n");
     return 0;
   }
   sAbort = 0;
