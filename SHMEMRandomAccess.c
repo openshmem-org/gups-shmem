@@ -122,27 +122,115 @@
 #include <stdio.h>
 #include "RandomAccess.h"
 #include <shmem.h>
-#define MAXTHREADS 256
-#define CHUNK    1
-#define CHUNKBIG (32*CHUNK)
 
-void
-do_abort(char* f)
+#define CHUNK    (1024)
+#define CHUNKBIG (32768)
+#define RCHUNK      (16384)
+#define PITER       8
+#define MAXLOGPROCS 20
+
+/* Allocate main table (in global memory) */
+
+u64Int *HPCC_Table;
+u64Int LocalSendBuffer[LOCAL_BUFFER_SIZE];
+u64Int LocalRecvBuffer[MAX_RECV*LOCAL_BUFFER_SIZE];
+
+/* This sort is manually unrolled to make sure the compiler can see 
+ * the parallelism -KDU
+ */
+
+void sort_data(u64Int *source, u64Int *nomatch, u64Int *match, int number, 
+               int *nnomatch, int *nmatch, int mask_shift)
 {
-  fprintf(stderr, "%s\n", f);
+  int i,dindex,myselect[8],counts[2];
+  int div_num = number / 8;
+  int loop_total = div_num * 8;
+  u64Int procmask = ((u64Int) 1) << mask_shift;
+  u64Int *buffers[2];
+
+  buffers[0] = nomatch;
+  counts[0] = *nnomatch;
+  buffers[1] = match;
+  counts[1] = *nmatch;
+
+  for (i = 0; i < div_num; i++) {
+    dindex = i*8;
+    myselect[0] = (source[dindex] & procmask) >> mask_shift;
+    myselect[1] = (source[dindex+1] & procmask) >> mask_shift;
+    myselect[2] = (source[dindex+2] & procmask) >> mask_shift;
+    myselect[3] = (source[dindex+3] & procmask) >> mask_shift;
+    myselect[4] = (source[dindex+4] & procmask) >> mask_shift;
+    myselect[5] = (source[dindex+5] & procmask) >> mask_shift;
+    myselect[6] = (source[dindex+6] & procmask) >> mask_shift;
+    myselect[7] = (source[dindex+7] & procmask) >> mask_shift;
+    buffers[myselect[0]][counts[myselect[0]]++] = source[dindex];
+    buffers[myselect[1]][counts[myselect[1]]++] = source[dindex+1];
+    buffers[myselect[2]][counts[myselect[2]]++] = source[dindex+2];
+    buffers[myselect[3]][counts[myselect[3]]++] = source[dindex+3];
+    buffers[myselect[4]][counts[myselect[4]]++] = source[dindex+4];
+    buffers[myselect[5]][counts[myselect[5]]++] = source[dindex+5];
+    buffers[myselect[6]][counts[myselect[6]]++] = source[dindex+6];
+    buffers[myselect[7]][counts[myselect[7]]++] = source[dindex+7];
+  }
+  
+  for (i = loop_total; i < number; i++) {
+    u64Int mydata = source[i];
+    if (mydata & procmask) buffers[1][counts[1]++] = mydata;
+    else buffers[0][counts[0]++] = mydata;
+  }
+  
+  *nnomatch = counts[0];
+  *nmatch = counts[1];
 }
 
-u64Int srcBuf[] = {
-  0xb1ffd1da
-};
-u64Int targetBuf[sizeof(srcBuf) / sizeof(u64Int)];
+/* Manual unrolling is a significant win if -Msafeptr is used -KDU */
 
-static s64Int count[MAXTHREADS];
-s64Int remotecount;
-s64Int updates[MAXTHREADS][MAXTHREADS];
-static s64Int ran;
+inline update_table(u64Int *data, u64Int *table, int number, int nlocalm1)
+{
+  int i,dindex,index;
+  int div_num = number / 8;
+  int loop_total = div_num * 8;
+  u64Int index0,index1,index2,index3,index4,index5,index6,index7;
+  u64Int ltable0,ltable1,ltable2,ltable3,ltable4,ltable5,ltable6,ltable7;
 
-void
+  for (i = 0; i < div_num; i++) {
+    dindex = i*8;
+
+    index0 = data[dindex] & nlocalm1;
+    index1 = data[dindex+1] & nlocalm1;
+    index2 = data[dindex+2] & nlocalm1;
+    index3 = data[dindex+3] & nlocalm1;
+    index4 = data[dindex+4] & nlocalm1;
+    index5 = data[dindex+5] & nlocalm1;
+    index6 = data[dindex+6] & nlocalm1;
+    index7 = data[dindex+7] & nlocalm1;
+    ltable0 = table[index0];
+    ltable1 = table[index1];
+    ltable2 = table[index2];
+    ltable3 = table[index3];
+    ltable4 = table[index4];
+    ltable5 = table[index5];
+    ltable6 = table[index6];
+    ltable7 = table[index7];
+
+    table[index0] = ltable0 ^ data[dindex];
+    table[index1] = ltable1 ^ data[dindex+1];
+    table[index2] = ltable2 ^ data[dindex+2];
+    table[index3] = ltable3 ^ data[dindex+3];
+    table[index4] = ltable4 ^ data[dindex+4];
+    table[index5] = ltable5 ^ data[dindex+5];
+    table[index6] = ltable6 ^ data[dindex+6];
+    table[index7] = ltable7 ^ data[dindex+7];
+  }
+
+  for (i = loop_total; i < number; i++) {
+    u64Int datum = data[i];
+    index = datum & nlocalm1;
+    table[index] ^= datum;
+  }
+}
+
+ void
 Power2NodesRandomAccessUpdate(u64Int logTableSize,
                                  u64Int TableSize,
                                  u64Int LocalTableSize,
@@ -153,66 +241,92 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
                                  int NumProcs,
                                  int Remainder,
                                  int MyProc,
-                                 s64Int ProcNumUpdates)
+                                 s64Int ProcNumUpdates
+                                 )
 {
-  int i,j,k;
-  int logTableLocal,ipartner,iterate,niterate;
-  int ndata,nkeep,nsend,index,nlocalm1;
-
-  u64Int datum,procmask;
-  u64Int *data,*send;
-  int remote_proc, offset;
-  u64Int *tb; 
-  int thisPeId;
-  int numNodes;
-  int count2;
-  
-  thisPeId = shmem_my_pe();
-  numNodes = shmem_n_pes();
-// The caller of this function is expected to call a global barrier before calling this function.
-//  shmem_barrier_all();     
-
+  int i,j;
+  int logTableLocal,ipartner,iterate,niterate,iter_mod;
+  int ndata,nkeep,nsend,nlocalm1, nkept;
+  static int nrecv;
+  u64Int ran,datum,procmask;
+  u64Int *data,*send,*send1,*send2;
+  u64Int *recv[PITER][MAXLOGPROCS];
 
   /* setup: should not really be part of this timed routine */
+
+  data = (u64Int *) shmem_malloc(CHUNKBIG*sizeof(u64Int));
+  send1 = (u64Int *) shmem_malloc(CHUNKBIG*sizeof(u64Int));
+  send2 = (u64Int *) shmem_malloc(CHUNKBIG*sizeof(u64Int));
+  send = send1;
+
+  for (j = 0; j < PITER; j++)
+    for (i = 0; i < logNumProcs; i++)
+      recv[j][i] = (u64Int *) shmem_malloc(sizeof(u64Int)*RCHUNK);
+
+  for (i = 0; i < LocalTableSize; i++)
+    HPCC_Table[i] = i + GlobalStartMyProc;
+
   ran = starts(4*GlobalStartMyProc);
 
-  niterate = ProcNumUpdates;
+  niterate = ProcNumUpdates / CHUNK;
   logTableLocal = logTableSize - logNumProcs;
   nlocalm1 = LocalTableSize - 1;
 
-  for (i = 0; i < numNodes; i++)
-      for (j = 0; j < MAXTHREADS; j++)
-        updates[i][j] = 0;
-
-  for (i = 0; i < numNodes; i++)
-    count[i] = 0;
-
-  shmem_barrier_all();
+  /* actual update loop: this is only section that should be timed */
   for (iterate = 0; iterate < niterate; iterate++) {
+    iter_mod = iterate % PITER;
+    for (i = 0; i < CHUNK; i++) {
       ran = (ran << 1) ^ ((s64Int) ran < ZERO64B ? POLY : ZERO64B);
-      remote_proc = (ran >> logTableLocal) & (numNodes - 1);
-      remotecount = shmem_longlong_g(&count[thisPeId],remote_proc);
-      shmem_longlong_p(&updates[thisPeId][remotecount],ran, remote_proc);
-      shmem_longlong_fadd(&count[thisPeId], 1, remote_proc);
+      data[i] = ran;
+    }
+    nkept = CHUNK;
+    nrecv = 0;
 
-      shmem_barrier_all();
-      
-      for(i = 0; i < numNodes; i++){
-	count2=count[i];
-        while (count2){
-          datum = updates[i][--count2];
-          index = datum & nlocalm1;
-          HPCC_Table[index] ^= datum;
-          updates[i][count2] = 0;
+    for (j = 0; j < logNumProcs; j++) {
+      nkeep = nsend = 0;
+      send = (send == send1) ? send2 : send1;
+      ipartner = (1 << j) ^ MyProc;
+      procmask = ((u64Int) 1) << (logTableLocal + j);
+      if (ipartner > MyProc) {
+      	sort_data(data,data,send,nkept,&nkeep,&nsend,logTableLocal+j);
+        if (j > 0) {
+	  shmem_barrier_all();
+      	  sort_data(recv[iter_mod][j-1],data,send,nrecv,&nkeep, 
+                    &nsend,logTableLocal+j);
         }
-	count[i]=0;
+      } else {
+        sort_data(data,send,data,nkept,&nsend,&nkeep,logTableLocal+j);
+        if (j > 0) {
+	  shmem_barrier_all();
+          sort_data(recv[iter_mod][j-1],send,data,nrecv,&nsend,
+                    &nkeep,logTableLocal+j);
+        }
       }
-
+      if (j > 0) shmem_quiet();
+      shmem_longlong_put(recv[iter_mod][j],send, nsend, ipartner);
+      shmem_int_p(&nrecv,nsend,ipartner);
+      if (j == (logNumProcs - 1)) update_table(data,HPCC_Table,nkeep,nlocalm1);
+      nkept = nkeep;
+    }
+    
+    if (logNumProcs == 0) update_table(data,HPCC_Table,nkept,nlocalm1);
+    else {
       shmem_barrier_all();
+      update_table(recv[iter_mod][j-1],HPCC_Table,nrecv,nlocalm1);
+      shmem_barrier_all();
+    }
+    
+    ndata = nkept + nrecv;
   }
 
-  shmem_barrier_all();
+  /* clean up: should not really be part of this timed routine */
 
+  for (j = 0; j < PITER; j++)
+    for (i = 0; i < logNumProcs; i++) shmem_free(recv[j][i]);
+
+  shmem_free(data);
+  shmem_free(send1);
+  shmem_free(send2);
 }
 
 HPCC_Params params;
@@ -221,13 +335,10 @@ int main(int argc, char **argv)
   int myRank, commSize;
   char *outFname;
   FILE *outputFile;
-  //static HPCC_Params params;
   time_t currentTime;
   int provided;
 
   shmem_init();
-
-
   outFname = "hpccoutf.txt";
 
   shmem_barrier_all();
@@ -235,14 +346,12 @@ int main(int argc, char **argv)
   HPCC_SHMEMRandomAccess( &params );
 
   shmem_finalize();
-  return 0;
 }
 
 /* Utility routine to start random number generator at Nth step */
 s64Int
 starts(u64Int n)
 {
-  /* s64Int i, j; */
   int i, j;
   u64Int m2[64];
   u64Int temp, ran;
