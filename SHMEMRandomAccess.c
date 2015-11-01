@@ -157,20 +157,20 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
 {
   int i,j,k;
   int logTableLocal,ipartner,iterate,niterate;
-  int ndata,nkeep,nsend,index,nlocalm1;
-
+  int ndata,nkeep,nsend,nrecv,index,nlocalm1;
+  int numthrds;
   u64Int datum,procmask;
   u64Int *data,*send;
+  void * tstatus;
   int remote_proc, offset;
-  u64Int *tb; 
+  u64Int *tb;
   int thisPeId;
   int numNodes;
   int count2;
-  
+
   thisPeId = shmem_my_pe();
   numNodes = shmem_n_pes();
-// The caller of this function is expected to call a global barrier before calling this function.
-//  shmem_barrier_all();     
+  shmem_barrier_all();
 
 
   /* setup: should not really be part of this timed routine */
@@ -188,24 +188,26 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
     count[i] = 0;
 
   shmem_barrier_all();
+
   for (iterate = 0; iterate < niterate; iterate++) {
       ran = (ran << 1) ^ ((s64Int) ran < ZERO64B ? POLY : ZERO64B);
       remote_proc = (ran >> logTableLocal) & (numNodes - 1);
-      remotecount = shmem_longlong_g(&count[thisPeId],remote_proc);
+      count[thisPeId] = shmem_longlong_g(&remotecount,remote_proc);
       shmem_longlong_p(&updates[thisPeId][remotecount],ran, remote_proc);
       shmem_longlong_fadd(&count[thisPeId], 1, remote_proc);
 
       shmem_barrier_all();
-      
+
       for(i = 0; i < numNodes; i++){
-	count2=count[i];
-        while (count2){
-          datum = updates[i][--count2];
+        count2 = 0;
+        while (count[i]){
+          datum = updates[i][count2];
           index = datum & nlocalm1;
           HPCC_Table[index] ^= datum;
           updates[i][count2] = 0;
+          count2++;
+          count[i]--;
         }
-	count[i]=0;
       }
 
       shmem_barrier_all();
@@ -216,25 +218,17 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
 }
 
 HPCC_Params params;
+
 int main(int argc, char **argv)
 {
   int myRank, commSize;
-  char *outFname;
-  FILE *outputFile;
-  //static HPCC_Params params;
   time_t currentTime;
   int provided;
 
   shmem_init();
-
-
-  outFname = "hpccoutf.txt";
-
-  shmem_barrier_all();
-
   HPCC_SHMEMRandomAccess( &params );
-
   shmem_finalize();
+
   return 0;
 }
 
