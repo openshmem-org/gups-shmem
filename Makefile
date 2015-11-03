@@ -9,32 +9,48 @@
 # even the implied warranty of MERCHANTABILITY or FITNESS FOR A            
 # PARTICULAR PURPOSE.                         
 
-CC=oshcc
-CXX=oshcc
-CFLAGS=-O3
+#
+# OpenSHMEM compiler commandss
+#
+CC             = oshcc
+CXX            = oshcxx
+LD             = $(CC)
 
+CFLAGS         = -O3
+
+#
+# any extra paths/flags needed
+#
 SHMEM_INC_PATH =
-INCDIR=-Iinclude $(SHMEM_INC_PATH)
+SHMEM_LDFLAGS  =
 
-SHMEMLDFLAG =
-LDFLAGS=$(CFLAGS) -lm  -ldl $(SHMEMLDFLAG)
+CPPFLAGS       = -I./include $(SHMEM_INC_PATH)
+LDFLAGS        = $(CFLAGS) $(SHMEM_LDFLAGS)
+LIBS           = -lm
 
-TARGET=ra_shmem
-OBJECTS=RandomAccess.o SHMEMRandomAccess.o verification.o
+TARGET         = gups
 
-.SUFFIXES: .c
+SOURCES        = RandomAccess.c SHMEMRandomAccess.c verification.c
+OBJECTS        = $(SOURCES:.c=.o) 
 
-.c.o:
-	$(CC) $(INCDIR) $(CFLAGS) -c $<
+.PHONY:	all	clean
 
-all:  RASHMEM
+#
+# make starts here
+#
 
-RASHMEM: $(OBJECTS) 
-	$(CC) $(INCDIR) $(CFLAGS) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+all:  $(TARGET)
+
+$(TARGET): $(OBJECTS) 
+	$(LD) $(LDFLAGS) $^ -o $@ $(LIBS)
 
 clean:
-	/bin/rm -f $(OBJECTS) core ra_shmem hpccoutf.txt
+	rm -f $(OBJECTS) $(TARGET)
 
-cleanall: 
-	/bin/rm -f $(OBJECTS) $(TARGET) core
 
+#
+# object/header deps
+#
+
+SHMEMRandomAccess.o:	RandomAccess.h
+verification.o:		RandomAccess.h
