@@ -1,4 +1,4 @@
 RandomAccess.o
 SHMEMRandomAccess.o
-ra_shmem
+gups
 verification.o
