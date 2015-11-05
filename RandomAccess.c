@@ -110,6 +110,13 @@
  * that is, four times the global table size.
  */
 
+/*
+ * OpenSHMEM version:
+ *
+ * Copyright (c) 2011 - 2015
+ *   University of Houston System and UT-Battelle, LLC.
+ *
+ */
 
 #include <hpcc.h>
 
@@ -164,7 +171,7 @@ HPCC_SHMEMRandomAccess(HPCC_Params *params) {
   FILE *outFile = NULL;
   double *GUPs;
   double *temp_GUPs;
-  
+
 
   int numthreads;
 
@@ -223,9 +230,9 @@ HPCC_SHMEMRandomAccess(HPCC_Params *params) {
 
 
 
-  shmem_barrier_all(); 
+  shmem_barrier_all();
   shmem_int_sum_to_all(&rAbort, &sAbort, 1, 0, 0, NumProcs, ipWrk, ipSync);
-  shmem_barrier_all(); 
+  shmem_barrier_all();
 
   if (rAbort > 0) {
     if (MyProc == 0) fprintf(outFile, "Failed to allocate memory for the main table.\n");
@@ -289,9 +296,9 @@ HPCC_SHMEMRandomAccess(HPCC_Params *params) {
   }
   /* distribute result to all nodes */
   temp_GUPs = GUPs;
-  shmem_barrier_all();  
+  shmem_barrier_all();
   shmem_broadcast64(GUPs,temp_GUPs,1,0,0,0,NumProcs,llpSync);
-  shmem_barrier_all(); 
+  shmem_barrier_all();
 
   /* Verification phase */
 

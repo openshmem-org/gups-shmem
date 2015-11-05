@@ -117,6 +117,13 @@
  * hybrid models.
  * Author: Siddhartha Jana
  */
+/*
+ * OpenSHMEM version:
+ *
+ * Copyright (c) 2011 - 2015
+ *   University of Houston System and UT-Battelle, LLC.
+ *
+ */
 
 #include <hpcc.h>
 #include <stdio.h>
