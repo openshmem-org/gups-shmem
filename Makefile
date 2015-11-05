@@ -20,10 +20,11 @@ CFLAGS         = -O3
 #
 SHMEM_INC_PATH =
 SHMEM_LDFLAGS  =
+SHMEM_LIBS     =
 
 CPPFLAGS       = -I./include $(SHMEM_INC_PATH)
 LDFLAGS        = $(CFLAGS) $(SHMEM_LDFLAGS)
-LIBS           = -lm
+LIBS           = $(SHMEM_LIBS) -lm
 
 TARGET         = gups
 

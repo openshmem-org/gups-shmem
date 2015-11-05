@@ -18,9 +18,12 @@ PGI's pgcc and then supply explicit header and library locations.
     LD             = $(CC)
 
     SHMEM_INC_PATH = -I/opt/openshmem/include
-    SHMEM_LDFLAGS  = -L/opt/openshmem/lib -lshmem
+    SHMEM_LDFLAGS  =
+    SHMEM_LIBS     = -L/opt/openshmem/lib -lshmem
 
-Or, if you have pkg-config support, you might be able to say
+Or, if you have pkg-config support, you might be able to say something
+like:
 
-    SHMEM_INC_PATH = $(shell pkg-config --cflags openshmem)
-    SHMEM_LDFLAGS  = $(shell pkg-config --libs openshmem)
+    SHMEM_INC_PATH = $(shell pkg-config --cflags openshmem ompi)
+    SHMEM_LDFLAGS  =
+    SHMEM_LIBS     = $(shell pkg-config --libs openshmem ompi)
