@@ -11,7 +11,7 @@
 #define PERIOD 1317624576693539401LL
 #endif
 
-/* Macros for timing */
+/* For timing */
 
 static double RTSEC()
 {

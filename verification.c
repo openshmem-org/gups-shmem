@@ -86,27 +86,23 @@ HPCC_Power2NodesSHMEMRandomAccessCheck(u64Int logTableSize,
         lpSync[i] = _SHMEM_SYNC_VALUE;
   }
 
-  //LocalBuckets = XMALLOC( u64Int, (NumProcs*(BUCKET_SIZE+FIRST_SLOT)));
   LocalBuckets = shmem_malloc(sizeof(u64Int)*NumProcs*(slot_size));
   sAbort = 0; if (! LocalBuckets) sAbort = 1;
-  //SHMEM_Allreduce( &sAbort, &rAbort, 1, SHMEM_INT, SHMEM_SUM, SHMEM_COMM_WORLD );
-  shmem_barrier_all(); // ???
+  shmem_barrier_all(); 
   shmem_int_sum_to_all(&rAbort, &sAbort, 1, 0, 0, NumProcs,ipWrk,ipSync );
-  shmem_barrier_all(); // ???
+  shmem_barrier_all(); 
 
   if (rAbort > 0) {
     if (MyProc == 0) fprintf(stderr, "Failed to allocate memory for local buckets.\n");
     goto failed_localbuckets;
   }
-  //GlobalBuckets = XMALLOC( u64Int, (NumProcs*(BUCKET_SIZE+FIRST_SLOT)));
   GlobalBuckets = shmem_malloc(sizeof(u64Int)*NumProcs*(slot_size));
 
   sAbort = 0; if (! GlobalBuckets) sAbort = 1;
 
-  //SHMEM_Allreduce( &sAbort, &rAbort, 1, SHMEM_INT, SHMEM_SUM, SHMEM_COMM_WORLD );
-  shmem_barrier_all(); // ???
+  shmem_barrier_all();
   shmem_int_sum_to_all(&rAbort, &sAbort, 1, 0, 0, NumProcs,ipWrk,ipSync );
-  shmem_barrier_all(); // ???
+  shmem_barrier_all(); 
 
   if (rAbort > 0) {
     if (MyProc == 0) fprintf(stderr, "Failed to allocate memory for global buckets.\n");
@@ -159,7 +155,7 @@ HPCC_Power2NodesSHMEMRandomAccessCheck(u64Int logTableSize,
          shmem_longlong_put(&GlobalBuckets[slot_size*MyProc],&LocalBuckets[slot_size*i],
                              slot_size,i);
 
-    shmem_barrier_all(); // ???
+    shmem_barrier_all(); 
 
     for (i = 0; i < NumProcs; i ++) {
       if(PeCheckDone[i] == HPCC_FALSE) {
@@ -182,13 +178,9 @@ HPCC_Power2NodesSHMEMRandomAccessCheck(u64Int logTableSize,
   *NumErrors = errors;
 
   free( PeCheckDone );
-
-  //free( GlobalBuckets );
   shmem_free( GlobalBuckets );
 
   failed_globalbuckets:
-
-  //free( LocalBuckets );
   shmem_free( LocalBuckets );
 
   failed_localbuckets:

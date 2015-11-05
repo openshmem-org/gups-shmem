@@ -334,7 +334,7 @@ HPCC_SHMEMRandomAccess(HPCC_Params *params) {
 
   /* Begin timing here */
 
-  RealTime = -RTSEC(); //???
+  RealTime = -RTSEC();
 
 
   HPCC_Power2NodesSHMEMRandomAccessCheck(logTableSize, TableSize, LocalTableSize,
@@ -343,9 +343,9 @@ HPCC_SHMEMRandomAccess(HPCC_Params *params) {
                                     MyProc, ProcNumUpdates,
                                     &NumErrors);
 
-  shmem_barrier_all(); // ???
+  shmem_barrier_all(); 
   shmem_longlong_sum_to_all( &GlbNumErrors,  &NumErrors, 1, 0,0, NumProcs,llpWrk, llpSync);
-  shmem_barrier_all(); // ???
+  shmem_barrier_all(); 
 
   /* End timed section */
 
