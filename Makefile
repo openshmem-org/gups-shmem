@@ -11,7 +11,6 @@
 # OpenSHMEM compiler commandss
 #
 CC             = oshcc
-CXX            = oshcxx
 LD             = $(CC)
 
 CFLAGS         = -O3
