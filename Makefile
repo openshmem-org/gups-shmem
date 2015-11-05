@@ -1,4 +1,13 @@
 #
+#
+# OpenSHMEM version:
+#
+# Copyright (c) 2011 - 2015
+#   University of Houston System and UT-Battelle, LLC.
+#
+#
+
+#
 # OpenSHMEM compiler commandss
 #
 CC             = oshcc

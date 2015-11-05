@@ -1,3 +1,13 @@
+OpenSHMEM version:
+
+  Copyright (c) 2011 - 2015
+    University of Houston System and UT-Battelle, LLC.
+
+
+
+
+
+                                                                         
 This is the OpenSHMEM version of GUPS (Giga Updates Per Second).
 
 This code has been translated from the MPI version of the 

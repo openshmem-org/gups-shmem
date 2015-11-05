@@ -1,3 +1,12 @@
+/*
+ * OpenSHMEM version:
+ *
+ * Copyright (c) 2011 - 2015
+ *   University of Houston System and UT-Battelle, LLC.
+ *
+ */
+
+
 #include <hpcc.h>
 #include "RandomAccess.h"
 #include <stdio.h>
@@ -155,4 +164,3 @@ HPCC_Power2NodesSHMEMRandomAccessCheck(u64Int logTableSize,
   failed_localbuckets:
   return;
 }
-
