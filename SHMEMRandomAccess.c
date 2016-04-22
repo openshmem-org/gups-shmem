@@ -230,7 +230,7 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
   for (iterate = 0; iterate < niterate; iterate++) {
       ran = (ran << 1) ^ ((s64Int) ran < ZERO64B ? POLY : ZERO64B);
       remote_proc = (ran >> logTableLocal) & (numNodes - 1);
-      count[thisPeId] = shmem_longlong_g(&remotecount,remote_proc);
+      remotecount = shmem_longlong_g(&count[thisPeId],remote_proc);
       shmem_longlong_p(&updates[thisPeId][remotecount],ran, remote_proc);
       shmem_longlong_fadd(&count[thisPeId], 1, remote_proc);
 
