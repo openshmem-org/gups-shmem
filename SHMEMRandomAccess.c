@@ -176,7 +176,6 @@ u64Int srcBuf[] = {
 u64Int targetBuf[sizeof(srcBuf) / sizeof(u64Int)];
 
 static s64Int count[MAXTHREADS];
-s64Int remotecount;
 s64Int updates[MAXTHREADS][MAXTHREADS];
 static s64Int ran;
 
@@ -202,6 +201,7 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
   void * tstatus;
   int remote_proc, offset;
   u64Int *tb;
+  s64Int remotecount;
   int thisPeId;
   int numNodes;
   int count2;
@@ -230,10 +230,8 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
   for (iterate = 0; iterate < niterate; iterate++) {
       ran = (ran << 1) ^ ((s64Int) ran < ZERO64B ? POLY : ZERO64B);
       remote_proc = (ran >> logTableLocal) & (numNodes - 1);
-      //remotecount = shmem_longlong_g(&count[thisPeId],remote_proc);
       remotecount = shmem_longlong_fadd(&count[thisPeId], 1, remote_proc);
       shmem_longlong_p(&updates[thisPeId][remotecount], ran, remote_proc);
-      //shmem_longlong_fadd(&count[thisPeId], 1, remote_proc);
 
       shmem_barrier_all();
 
