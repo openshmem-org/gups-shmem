@@ -175,8 +175,8 @@ u64Int srcBuf[] = {
 };
 u64Int targetBuf[sizeof(srcBuf) / sizeof(u64Int)];
 
-static s64Int count[MAXTHREADS];
-s64Int updates[MAXTHREADS][MAXTHREADS];
+static s64Int count;
+s64Int updates[MAXTHREADS];
 static s64Int ran;
 
 void
@@ -218,36 +218,25 @@ Power2NodesRandomAccessUpdate(u64Int logTableSize,
   logTableLocal = logTableSize - logNumProcs;
   nlocalm1 = LocalTableSize - 1;
 
-  for (i = 0; i < numNodes; i++)
-      for (j = 0; j < MAXTHREADS; j++)
-        updates[i][j] = 0;
-
-  for (i = 0; i < numNodes; i++)
-    count[i] = 0;
-
-  shmem_barrier_all();
+  for (j = 0; j < MAXTHREADS; j++)
+    updates[j] = 0;
 
   for (iterate = 0; iterate < niterate; iterate++) {
+      count = 0;
+      shmem_barrier_all();
       ran = (ran << 1) ^ ((s64Int) ran < ZERO64B ? POLY : ZERO64B);
       remote_proc = (ran >> logTableLocal) & (numNodes - 1);
-      remotecount = shmem_longlong_fadd(&count[thisPeId], 1, remote_proc);
-      shmem_longlong_p(&updates[thisPeId][remotecount], ran, remote_proc);
+      remotecount = shmem_longlong_fadd(&count, 1, remote_proc);
+      shmem_longlong_p(&updates[remotecount], ran, remote_proc);
 
       shmem_barrier_all();
 
-      for(i = 0; i < numNodes; i++){
-        count2 = 0;
-        while (count[i]){
-          datum = updates[i][count2];
+      for(i=0;i<count;i++) {
+          datum = updates[i];
           index = datum & nlocalm1;
           HPCC_Table[index] ^= datum;
-          updates[i][count2] = 0;
-          count2++;
-          count[i]--;
-        }
+          updates[i] = 0;
       }
-
-      shmem_barrier_all();
   }
 
   shmem_barrier_all();
