@@ -42,7 +42,7 @@
 CC             = oshcc
 LD             = $(CC)
 
-CFLAGS         = -O3
+CFLAGS         = -O2
 
 #
 # any extra paths/flags needed
